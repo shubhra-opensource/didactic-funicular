@@ -1,0 +1,38 @@
+Here is a step-by-step approach to transitioning from lexicon-based detection to AI-powered surveillance for long email texts with lexicon terms occurring in the middle:
+
+### Step 1: Data Preparation and Labeling
+- **Extract Emails and Segment:** Extract your long email texts from your communication systems. Segment them into manageable chunks if needed (e.g., sentences or paragraphs).
+- **Label Data:** Use your existing lexicon tool to label which emails or chunks contain market abuse indicators. Also, manually label a subset to create a high-quality ground truth dataset.
+- **Identify Key Lexicon Occurrences:** Mark where in the email the lexicons appear for downstream explainability.
+
+### Step 2: Baseline Model with Lexicon Alerts
+- **Run Lexicon Matching:** Continue running your current lexicon pattern matching on the entire email text to detect potential abuse.
+- **Record Lexicon Positions:** Store the positions of lexicon hits within each email or segment.
+
+### Step 3: Feature Engineering with Contextual Embeddings
+- **Get Text Embeddings:** Use transformer-based language models pre-trained on finance or general domains (e.g., FinBERT) to generate contextual embeddings for the full email or segments.
+- **Incorporate Lexicon Indicators:** Add features indicating lexicon presence and location to the embeddings, allowing the model to combine semantic context with lexicon signals.
+
+### Step 4: Train a Hybrid AI Model
+- **Model Design:** Train a classifier (e.g., fine-tuned FinBERT with added lexical feature inputs) using labeled data to differentiate abusive from non-abusive communications.
+- **Consider Sequence Modeling:** Since lexicons appear within long text, use models capable of handling long sequences or hierarchical models that combine sentence-level and document-level understanding.
+- **Leverage Named Entity Recognition (NER):** Extract named financial entities and events for additional context.
+
+### Step 5: Implement Explainable AI Techniques
+- **Highlight Lexicon Influence:** Use SHAP or LIME to explain model decisions, showing how both lexicons and contextual features contributed to alerts.
+- **Visualize Important Text:** Provide compliance analysts with highlighted parts of emails that triggered flags, focusing especially on lexicon hits and surrounding context.
+
+### Step 6: Deploy Phased AI-Powered Alerting
+- **Alert Triage:** Initially, use AI only to re-rank or triage lexicon-generated alerts based on confidence scores.
+- **Analyst Review:** Gather feedback from compliance teams on alert relevance to retrain the model iteratively.
+
+### Step 7: Expand Model Scope Beyond Lexicons
+- **Detect Novel Patterns:** Use few-shot or active learning to incorporate new abuse patterns and language variations that lexicons miss.
+- **Continuous Learning:** Create pipelines for ongoing labeling and model refinement as new data arrives.
+
+### Step 8: Monitor, Audit, and Improve
+- **Impact Monitoring:** Track false positives, false negatives, and analyst workload reductions.
+- **Regular Retraining:** Periodically retrain models with newly labeled data to adapt to evolving communication styles and abuse tactics.
+- **Compliance Audits:** Maintain explainability documentation for regulators, showing how lexicons and AI jointly enforce surveillance.
+
+This approach combines the strengths of lexicon-based precision with AI’s contextual understanding, especially suited for long email texts where abuse indicators may be buried within extensive content. It maintains explainability and regulatory trust while reducing manual effort over time.
