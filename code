@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+import shap
+import re
+
+# Step 1: Data Loading and Preprocessing
+def load_emails(file_path):
+    # Load emails from your data source
+    emails = pd.read_csv(file_path)
+    return emails
+
+def segment_email(email_text):
+    # Simple segmentation into sentences
+    sentences = re.split(r'(?<=[.!?])\s+', email_text)
+    return sentences
+
+# Sample function to label data (for training)
+def label_data(emails, lexicon_list):
+    labels = []
+    for email in emails:
+        label = 0  # Default: non-abusive
+        for lexicon in lexicon_list:
+            if lexicon in email:
+                label = 1
+                break
+        labels.append(label)
+    return labels
+
+# Step 2: Lexicon Matching
+def match_lexicons(email_text, lexicon_list):
+    hits = []
+    for lex in lexicon_list:
+        if lex in email_text:
+            hits.append(lex)
+    return hits
+
+# Step 3: Embedding Extraction
+tokenizer = AutoTokenizer.from_pretrained("finbert-uncased")
+model = AutoModelForSequenceClassification.from_pretrained("finbert-uncased", num_labels=2)
+
+def get_embeddings(texts):
+    inputs = tokenizer(texts, padding=True, truncation=True, max_length=512, return_tensors="pt")
+    with torch.no_grad():
+        outputs = model.base_model(**inputs)
+    return outputs.last_hidden_state.mean(dim=1).numpy()
+
+# Step 4: Model Training
+def train_classifier(X_train, y_train):
+    # Fine-tune a classifier on X_train, y_train
+    model = AutoModelForSequenceClassification.from_pretrained("finbert-uncased", num_labels=2)
+    # Setup training parameters and fine-tuning loop (omitted for brevity)
+    # For simplicity, assume model is trained here
+    return model
+
+# Step 5: Explainability
+def explain_model(model, texts):
+    explainer = shap.Explainer(model, tokenizer)
+    shap_values = explainer(texts)
+    return shap_values
+
+# Step 6: Deployment and Feedback Loop
+def predict_and_explain(model, texts):
+    embeddings = get_embeddings(texts)
+    predictions = np.argmax(embeddings, axis=1)
+    shap_values = explain_model(model, texts)
+    return predictions, shap_values
+
+# Main pipeline
+def main():
+    # Load data
+    emails_df = load_emails('your_email_data.csv')  # Your data file
+    lexicon_list = ['abuse_word1', 'abuse_word2', 'manipulation']  # Your lexicons
+
+    # Data preprocessing
+    emails_df['segments'] = emails_df['email_text'].apply(segment_email)
+    # Create dataset with labels
+    emails_df['label'] = label_data(emails_df['email_text'], lexicon_list)
+
+    # Prepare data for training
+    X = emails_df['email_text'].values
+    y = emails_df['label'].values
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Train model
+    trained_model = train_classifier(X_train, y_train)
+
+    # Evaluate and explain
+    predictions, shap_vals = predict_and_explain(trained_model, X_test)
+
+    # Example output
+    print(classification_report(y_test, predictions))
+    shap.summary_plot(shap_vals, X_test)
+
+if __name__ == "__main__":
+    main()
