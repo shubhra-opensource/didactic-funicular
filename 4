@@ -1,0 +1,588 @@
+This code uses Hugging Face transformers (FinBERT), assumes labeled data in CSV, and includes functions for lexicon matching, embedding extraction, model training, and explainability.
+You’ll need to implement or adapt training routines for fine-tuning the transformer-based classifier.
+For long emails, consider hierarchical or truncation strategies; here, we use max_length=512.
+This provides a starting point. You should expand it with actual training code, deployment, active learning loops, and integration with your existing systems.
+Would you like me to generate a more detailed, ready-to-run version of this code with specific instructions, or focus on particular steps like training, explainability, or deployment?
+
+ Create example scripts showing how to use the pipeline
+
+example_usage = '''#!/usr/bin/env python3
+"""
+Example usage of the Market Abuse Surveillance Pipeline
+This script demonstrates how to use the complete pipeline for transitioning
+from lexicon-based to AI-powered surveillance.
+"""
+
+import pandas as pd
+import numpy as np
+from surveillance_pipeline_complete import SurveillancePipeline
+from config import DEFAULT_LEXICONS, ModelConfig, TrainingConfig
+from preprocessing_utils import EmailTextProcessor, load_email_dataset
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+def main():
+    """Main execution function"""
+    print("=== Market Abuse Surveillance Pipeline - Complete Example ===\\n")
+    
+    # Step 1: Initialize the pipeline with your lexicon dictionary
+    logger.info("Step 1: Initializing surveillance pipeline...")
+    
+    # You can customize this lexicon based on your specific abuse types
+    custom_lexicons = {
+        'insider_trading': [
+            'inside information', 'confidential deal', 'material non-public',
+            'tip off', 'insider knowledge', 'advance notice'
+        ],
+        'market_manipulation': [
+            'pump and dump', 'coordinate buying', 'artificial demand',
+            'manipulate price', 'wash trading', 'spoofing'
+        ],
+        'collusion': [
+            'coordinate strategy', 'agree on price', 'split the market',
+            'fix the rate', 'price fixing'
+        ]
+    }
+    
+    pipeline = SurveillancePipeline(custom_lexicons)
+    
+    # Step 2: Prepare your email data
+    logger.info("Step 2: Loading and preprocessing email data...")
+    
+    # Example with sample data (replace with your actual data loading)
+    sample_emails = [
+        """
+        Dear John,
+        
+        I hope this email finds you well. Following our conversation about the 
+        quarterly earnings, I wanted to share some inside information that might 
+        be useful for our trading strategy.
+        
+        The management team has indicated that the announcement will be made next 
+        week, and the numbers look very promising. This is confidential information 
+        that should not be shared outside our team.
+        
+        Let me know if you want to discuss this further.
+        
+        Best regards,
+        Alice
+        """,
+        
+        """
+        Team,
+        
+        I've been analyzing the market trends for the past few weeks, and I think 
+        we have an opportunity to coordinate our buying strategy in the tech sector.
+        
+        If we time our purchases correctly and coordinate the volume, we can create 
+        artificial demand that will drive up prices. This approach has worked well 
+        in similar situations.
+        
+        Let's schedule a call to discuss the details.
+        
+        Bob
+        """,
+        
+        """
+        Hi Sarah,
+        
+        Thank you for the market analysis report. The research on emerging markets 
+        was particularly insightful. I think we should consider adjusting our 
+        portfolio allocation based on these findings.
+        
+        The technology sector fundamentals look strong, and the growth projections 
+        are encouraging. Let's discuss this in our next team meeting.
+        
+        Best,
+        Michael
+        """
+    ]
+    
+    # Corresponding labels (1 = suspicious, 0 = clean)
+    sample_labels = [1, 1, 0]
+    
+    # Step 3: Process emails and extract lexicon features
+    logger.info("Step 3: Processing emails and extracting features...")
+    
+    processor = EmailTextProcessor()
+    cleaned_emails = [processor.clean_text(email) for email in sample_emails]
+    
+    # Create initial dataset
+    df = pipeline.data_processor.create_labeled_dataset(cleaned_emails, sample_labels)
+    
+    print("\\nProcessed Email Dataset:")
+    print(f"Total emails: {len(df)}")
+    for idx, row in df.iterrows():
+        print(f"\\nEmail {idx + 1}:")
+        print(f"  Length: {row['text_length']} characters")
+        print(f"  Lexicon matches: {row['num_matches']}")
+        print(f"  Final label: {'Suspicious' if row['final_label'] == 1 else 'Clean'}")
+        
+        if row['lexicon_matches']:
+            print("  Detected patterns:")
+            for abuse_type, matches in row['lexicon_matches'].items():
+                print(f"    - {abuse_type}: {len(matches)} matches")
+                for match in matches[:2]:  # Show first 2 matches
+                    print(f"      * '{match['keyword']}' at position {match['start']}")
+    
+    # Step 4: Train initial AI model (uncomment when you have actual model files)
+    logger.info("Step 4: Setting up AI model...")
+    
+    print("\\n*** MODEL TRAINING STEP ***")
+    print("To train the actual AI model, you need to:")
+    print("1. Install required packages: pip install -r requirements.txt")
+    print("2. Ensure you have GPU access (recommended)")
+    print("3. Uncomment the following lines:")
+    print()
+    print("# pipeline.setup_model('ProsusAI/finbert')")
+    print("# trainer = pipeline.train_initial_model(cleaned_emails, sample_labels)")
+    print()
+    
+    # Step 5: Demonstrate lexicon-based processing (current capability)
+    logger.info("Step 5: Demonstrating current lexicon-based processing...")
+    
+    test_email = """
+    Hi team, I just received some material non-public information about the upcoming 
+    merger. We should coordinate our trading strategy to take advantage of this 
+    opportunity. The deal will be announced next week, so we need to position 
+    ourselves carefully before the announcement.
+    """
+    
+    result = pipeline.process_email(test_email)
+    
+    print("\\n=== EMAIL ANALYSIS RESULT ===")
+    print(f"Email text preview: {test_email[:100]}...")
+    print(f"Lexicon alert: {result['lexicon_alert']}")
+    print(f"Final alert: {result['final_alert']}")
+    
+    if result['lexicon_matches']:
+        print("\\nDetected suspicious patterns:")
+        for abuse_type, matches in result['lexicon_matches'].items():
+            print(f"  {abuse_type.replace('_', ' ').title()}:")
+            for match in matches:
+                print(f"    - '{match['keyword']}' (context: ...{match['context'][:50]}...)")
+    
+    # Step 6: Demonstrate active learning workflow
+    logger.info("Step 6: Active learning workflow demo...")
+    
+    print("\\n=== ACTIVE LEARNING WORKFLOW ===")
+    print("1. Start with small labeled dataset")
+    print("2. Train initial model")
+    print("3. Use uncertainty sampling to select most informative unlabeled examples")
+    print("4. Get analyst feedback on selected examples")
+    print("5. Retrain model with new labels")
+    print("6. Repeat until desired performance is achieved")
+    
+    # Step 7: Performance monitoring setup
+    logger.info("Step 7: Setting up performance monitoring...")
+    
+    print("\\n=== MONITORING SETUP ===")
+    print("Performance thresholds configured:")
+    config = ModelConfig()
+    print("- Accuracy: ≥ 85%")
+    print("- Precision: ≥ 80%")
+    print("- Recall: ≥ 75%")
+    print("- F1-Score: ≥ 77%")
+    
+    # Step 8: Integration recommendations
+    print("\\n=== INTEGRATION RECOMMENDATIONS ===")
+    print("Phase 1 (Months 1-6): AI-Powered Alert Triage")
+    print("- Keep existing lexicon system")
+    print("- Use AI to score and prioritize lexicon alerts")
+    print("- Reduce false positives by 60-75%")
+    print()
+    
+    print("Phase 2 (Months 6-12): Hybrid Detection")
+    print("- Run AI and lexicon systems in parallel")
+    print("- Use weakly supervised learning")
+    print("- Implement few-shot learning for new patterns")
+    print()
+    
+    print("Phase 3 (Months 12-18): AI-Primary Detection")
+    print("- AI becomes primary detection engine")
+    print("- Lexicons provide validation and explainability")
+    print("- Deploy graph neural networks for relationship analysis")
+    print()
+    
+    print("Phase 4 (Months 18+): Continuous Learning")
+    print("- Fully automated continuous learning pipeline")
+    print("- Real-time model adaptation")
+    print("- Advanced explainability for regulatory compliance")
+    
+    logger.info("Example completed successfully!")
+    return pipeline, df
+
+def demonstrate_batch_processing():
+    """Demonstrate processing multiple emails in batch"""
+    print("\\n=== BATCH PROCESSING DEMO ===")
+    
+    # Simulate batch of emails from different sources
+    email_batch = [
+        {
+            'id': 'email_001',
+            'source': 'trader_communications',
+            'text': 'Lets coordinate our positions before the announcement tomorrow.',
+            'timestamp': '2025-10-24 09:00:00'
+        },
+        {
+            'id': 'email_002', 
+            'source': 'sales_communications',
+            'text': 'The quarterly results look good. Standard meeting agenda attached.',
+            'timestamp': '2025-10-24 09:15:00'
+        },
+        {
+            'id': 'email_003',
+            'source': 'research_communications', 
+            'text': 'I have some inside information about the merger. This is confidential.',
+            'timestamp': '2025-10-24 09:30:00'
+        }
+    ]
+    
+    # Initialize pipeline
+    pipeline = SurveillancePipeline(DEFAULT_LEXICONS)
+    
+    # Process batch
+    results = []
+    for email in email_batch:
+        result = pipeline.process_email(email['text'])
+        result.update({
+            'email_id': email['id'],
+            'source': email['source'],
+            'timestamp': email['timestamp']
+        })
+        results.append(result)
+    
+    # Display results
+    print("Batch Processing Results:")
+    for result in results:
+        alert_status = "🚨 ALERT" if result['final_alert'] else "✅ CLEAN"
+        print(f"\\n{result['email_id']} ({result['source']}) - {alert_status}")
+        
+        if result['lexicon_matches']:
+            for abuse_type, matches in result['lexicon_matches'].items():
+                print(f"  - {abuse_type}: {len(matches)} matches")
+    
+    return results
+
+if __name__ == "__main__":
+    try:
+        # Run main demo
+        pipeline, processed_data = main()
+        
+        # Run batch processing demo
+        batch_results = demonstrate_batch_processing()
+        
+        print("\\n=== DEMO COMPLETED SUCCESSFULLY ===")
+        print("\\nNext Steps:")
+        print("1. Prepare your actual email dataset")
+        print("2. Install required dependencies")
+        print("3. Train the model on your data")
+        print("4. Set up explainability and monitoring")
+        print("5. Deploy in production with gradual rollout")
+        
+    except Exception as e:
+        logger.error(f"Demo failed: {e}")
+        raise
+'''
+
+with open('example_usage.py', 'w') as f:
+    f.write(example_usage)
+
+# Create deployment script
+deployment_script = '''#!/usr/bin/env python3
+"""
+Deployment script for Market Abuse Surveillance Pipeline
+This script helps deploy the pipeline in production environments.
+"""
+
+import os
+import json
+import logging
+from pathlib import Path
+from surveillance_pipeline_complete import SurveillancePipeline
+from config import ModelConfig, TrainingConfig, MonitoringConfig
+import schedule
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('surveillance_deployment.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class ProductionSurveillance:
+    """Production deployment wrapper for surveillance pipeline"""
+    
+    def __init__(self, config_path: str = "production_config.json"):
+        self.config_path = config_path
+        self.pipeline = None
+        self.load_configuration()
+        self.setup_pipeline()
+    
+    def load_configuration(self):
+        """Load production configuration"""
+        try:
+            if os.path.exists(self.config_path):
+                with open(self.config_path, 'r') as f:
+                    self.config = json.load(f)
+                logger.info(f"Loaded configuration from {self.config_path}")
+            else:
+                # Create default configuration
+                self.config = {
+                    "lexicon_dict": {
+                        "insider_trading": [
+                            "inside information", "confidential deal", "material non-public"
+                        ],
+                        "market_manipulation": [
+                            "pump and dump", "coordinate buying", "artificial demand"
+                        ]
+                    },
+                    "model_name": "ProsusAI/finbert",
+                    "monitoring": {
+                        "performance_thresholds": {
+                            "accuracy": 0.85,
+                            "precision": 0.80,
+                            "recall": 0.75
+                        }
+                    },
+                    "email_sources": [
+                        {"type": "database", "connection": "your_db_connection"},
+                        {"type": "file", "path": "/data/emails/"}
+                    ]
+                }
+                
+                # Save default configuration
+                with open(self.config_path, 'w') as f:
+                    json.dump(self.config, f, indent=2)
+                logger.info(f"Created default configuration at {self.config_path}")
+                
+        except Exception as e:
+            logger.error(f"Failed to load configuration: {e}")
+            raise
+    
+    def setup_pipeline(self):
+        """Initialize the surveillance pipeline"""
+        try:
+            self.pipeline = SurveillancePipeline(self.config["lexicon_dict"])
+            
+            # Setup model if available
+            model_path = self.config.get("model_path")
+            if model_path and os.path.exists(model_path):
+                self.pipeline.load_trained_model(model_path)
+                logger.info("Loaded pre-trained model")
+            else:
+                logger.warning("No pre-trained model found. Using lexicon-only mode.")
+            
+        except Exception as e:
+            logger.error(f"Failed to setup pipeline: {e}")
+            raise
+    
+    def process_new_emails(self):
+        """Process newly arrived emails"""
+        try:
+            logger.info("Processing new emails...")
+            
+            # This would connect to your actual email sources
+            # For demo, we'll simulate
+            new_emails = self.fetch_new_emails()
+            
+            alerts = []
+            for email in new_emails:
+                result = self.pipeline.process_email(email['text'])
+                
+                if result['final_alert']:
+                    alert = {
+                        'email_id': email.get('id'),
+                        'timestamp': email.get('timestamp'),
+                        'alert_type': 'ai_detected' if result['ai_prediction'] else 'lexicon_detected',
+                        'confidence': result.get('ai_confidence', 1.0),
+                        'matches': result['lexicon_matches'],
+                        'text_preview': email['text'][:200] + '...'
+                    }
+                    alerts.append(alert)
+            
+            # Save alerts
+            if alerts:
+                self.save_alerts(alerts)
+                logger.info(f"Generated {len(alerts)} alerts")
+            
+            return alerts
+            
+        except Exception as e:
+            logger.error(f"Failed to process emails: {e}")
+            return []
+    
+    def fetch_new_emails(self):
+        """Fetch new emails from configured sources"""
+        # This is a placeholder - implement based on your email sources
+        # Examples:
+        # - Database queries
+        # - File system monitoring
+        # - API calls to email systems
+        
+        sample_emails = [
+            {
+                'id': 'email_' + str(int(time.time())),
+                'text': 'Sample email for demonstration',
+                'timestamp': time.time(),
+                'source': 'demo'
+            }
+        ]
+        
+        return sample_emails
+    
+    def save_alerts(self, alerts):
+        """Save alerts to configured destination"""
+        alerts_file = f"alerts_{int(time.time())}.json"
+        
+        try:
+            with open(alerts_file, 'w') as f:
+                json.dump(alerts, f, indent=2)
+            logger.info(f"Saved {len(alerts)} alerts to {alerts_file}")
+            
+            # Also send to monitoring system
+            self.send_to_monitoring(alerts)
+            
+        except Exception as e:
+            logger.error(f"Failed to save alerts: {e}")
+    
+    def send_to_monitoring(self, alerts):
+        """Send alerts to monitoring/alerting system"""
+        # Implement integration with your monitoring system
+        # Examples:
+        # - Send to SIEM
+        # - Email notifications
+        # - Slack/Teams alerts
+        # - Dashboard updates
+        
+        high_confidence_alerts = [a for a in alerts if a.get('confidence', 0) > 0.8]
+        if high_confidence_alerts:
+            logger.warning(f"High confidence alerts detected: {len(high_confidence_alerts)}")
+    
+    def health_check(self):
+        """Perform system health check"""
+        checks = {
+            'pipeline_initialized': self.pipeline is not None,
+            'model_loaded': hasattr(self.pipeline, 'model') and self.pipeline.model is not None,
+            'config_valid': bool(self.config),
+            'disk_space': self.check_disk_space(),
+            'memory_usage': self.check_memory_usage()
+        }
+        
+        logger.info(f"Health check results: {checks}")
+        return all(checks.values())
+    
+    def check_disk_space(self):
+        """Check available disk space"""
+        import shutil
+        
+        _, _, free = shutil.disk_usage(".")
+        free_gb = free // (1024**3)
+        return free_gb > 1  # At least 1GB free
+    
+    def check_memory_usage(self):
+        """Check memory usage"""
+        import psutil
+        
+        memory = psutil.virtual_memory()
+        return memory.percent < 85  # Less than 85% memory usage
+    
+    def run_monitoring_cycle(self):
+        """Run one monitoring cycle"""
+        try:
+            logger.info("Starting monitoring cycle...")
+            
+            # Health check
+            if not self.health_check():
+                logger.error("Health check failed")
+                return
+            
+            # Process new emails
+            alerts = self.process_new_emails()
+            
+            # Performance monitoring (if model is available)
+            if self.pipeline.model:
+                self.monitor_model_performance()
+            
+            logger.info("Monitoring cycle completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Monitoring cycle failed: {e}")
+    
+    def monitor_model_performance(self):
+        """Monitor AI model performance"""
+        # This would typically involve:
+        # - Running model on validation set
+        # - Checking for performance drift
+        # - Alerting if thresholds are breached
+        
+        logger.info("Model performance monitoring - placeholder")
+    
+    def start_continuous_monitoring(self):
+        """Start continuous monitoring"""
+        logger.info("Starting continuous surveillance monitoring...")
+        
+        # Schedule regular processing
+        schedule.every(5).minutes.do(self.run_monitoring_cycle)
+        schedule.every(1).hour.do(self.health_check)
+        
+        # Keep running
+        try:
+            while True:
+                schedule.run_pending()
+                time.sleep(60)  # Check every minute
+                
+        except KeyboardInterrupt:
+            logger.info("Monitoring stopped by user")
+        except Exception as e:
+            logger.error(f"Monitoring failed: {e}")
+
+def deploy_production():
+    """Deploy surveillance system in production"""
+    print("=== Production Deployment ===\\n")
+    
+    # Initialize production surveillance
+    surveillance = ProductionSurveillance()
+    
+    print("Deployment options:")
+    print("1. Run single monitoring cycle")
+    print("2. Start continuous monitoring")
+    print("3. Health check only")
+    print("4. Process current email backlog")
+    
+    choice = input("\\nEnter choice (1-4): ").strip()
+    
+    if choice == "1":
+        surveillance.run_monitoring_cycle()
+    elif choice == "2":
+        surveillance.start_continuous_monitoring()
+    elif choice == "3":
+        health = surveillance.health_check()
+        print(f"System health: {'OK' if health else 'ISSUES'}")
+    elif choice == "4":
+        alerts = surveillance.process_new_emails()
+        print(f"Processed emails, generated {len(alerts)} alerts")
+    else:
+        print("Invalid choice")
+
+if __name__ == "__main__":
+    deploy_production()
+'''
+
+with open('deploy_production.py', 'w') as f:
+    f.write(deployment_script)
+
+print("Created example and deployment scripts:")
+print("1. example_usage.py - Complete usage example")
+print("2. deploy_production.py - Production deployment script")
